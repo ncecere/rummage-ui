@@ -18,7 +18,6 @@ export function Navbar() {
   const navLinks = [
     { href: "/documentation", label: "Documentation" },
     { href: "/examples", label: "Examples" },
-    { href: "/api", label: "API" },
   ]
 
   return (
@@ -100,4 +99,3 @@ export function Navbar() {
     </header>
   )
 }
-
