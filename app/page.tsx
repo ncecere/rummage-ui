@@ -47,10 +47,10 @@ export default function Home() {
   // Crawl options
   const [excludePaths, setExcludePaths] = useState("")
   const [includePaths, setIncludePaths] = useState("")
-  const [maxDepth, setMaxDepth] = useState(3)
+  const [maxDepth, setMaxDepth] = useState<number | string>(3)
   const [ignoreSitemap, setIgnoreSitemap] = useState(false)
   const [ignoreQueryParameters, setIgnoreQueryParameters] = useState(true)
-  const [limit, setLimit] = useState(100)
+  const [limit, setLimit] = useState<number | string>(100)
   const [allowBackwardLinks, setAllowBackwardLinks] = useState(false)
   const [allowExternalLinks, setAllowExternalLinks] = useState(false)
   const [crawlFormats, setCrawlFormats] = useState<string[]>(["markdown"])
@@ -721,7 +721,16 @@ export default function Home() {
                             min="1"
                             max="10"
                             value={maxDepth}
-                            onChange={(e) => setMaxDepth(Number.parseInt(e.target.value) || 3)}
+                            onChange={(e) => {
+                              // Allow empty value while typing, but use default when blurred
+                              const value = e.target.value;
+                              setMaxDepth(value === "" ? "" : Number.parseInt(value) || 3);
+                            }}
+                            onBlur={(e) => {
+                              // When field loses focus, ensure we have a valid number
+                              const value = Number.parseInt(e.target.value);
+                              setMaxDepth(isNaN(value) ? 3 : value);
+                            }}
                             className="bg-background border-input"
                           />
                         </div>
@@ -736,7 +745,16 @@ export default function Home() {
                             min="1"
                             max="500"
                             value={limit}
-                            onChange={(e) => setLimit(Number.parseInt(e.target.value) || 100)}
+                            onChange={(e) => {
+                              // Allow empty value while typing, but use default when blurred
+                              const value = e.target.value;
+                              setLimit(value === "" ? "" : Number.parseInt(value) || 100);
+                            }}
+                            onBlur={(e) => {
+                              // When field loses focus, ensure we have a valid number
+                              const value = Number.parseInt(e.target.value);
+                              setLimit(isNaN(value) ? 100 : value);
+                            }}
                             className="bg-background border-input"
                           />
                         </div>
@@ -862,15 +880,15 @@ export default function Home() {
                       </Button>
                     </div>
                     <div className="bg-muted rounded-md overflow-hidden">
-                      <div className="max-h-[500px] overflow-auto">
-                        <table className="w-full">
+                      <div className="h-[500px] max-h-[500px] overflow-auto relative">
+                        <table className="w-full min-w-full table-fixed">
                           <thead className="sticky top-0 bg-background">
                             <tr className="border-b border-border">
                               <th className="text-left p-3 font-medium">URL</th>
                               <th className="text-right p-3 w-32 font-medium">Actions</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="relative">
                             {crawlResults.map((result, index) => (
                               <tr key={index} className="border-b border-border">
                                 <td className="p-3 truncate max-w-[300px]">
@@ -934,4 +952,3 @@ export default function Home() {
     </div>
   )
 }
-
