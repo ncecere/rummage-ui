@@ -6,7 +6,7 @@
 echo "Simulating release process for v0.1.0..."
 echo ""
 echo "1. GitHub would receive the tag push event"
-echo "2. GitHub Actions would trigger the following workflows:"
+echo "2. GitHub Actions would trigger the following workflows (only on tag push):"
 echo "   - .github/workflows/docker-build.yml"
 echo "   - .github/workflows/release.yml"
 echo ""

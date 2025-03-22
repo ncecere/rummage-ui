@@ -115,10 +115,12 @@ This will trigger the GitHub Actions workflows to:
 
 ### GitHub Workflows
 
-This project includes two GitHub workflows:
+This project includes two GitHub workflows that **only run when a tag is pushed**:
 
-1. **Docker Build** (`.github/workflows/docker-build.yml`): Builds and pushes the Docker image to GitHub Container Registry when a new tag is pushed.
-2. **Create Release** (`.github/workflows/release.yml`): Creates a GitHub release with auto-generated changelog when a new tag is pushed.
+1. **Docker Build** (`.github/workflows/docker-build.yml`): Builds and pushes the Docker image to GitHub Container Registry.
+2. **Create Release** (`.github/workflows/release.yml`): Creates a GitHub release with auto-generated changelog.
+
+These workflows will not run on regular commits to branches, only when you create and push a tag starting with 'v' (e.g., v0.1.0).
 
 You can simulate the release process without actually pushing a tag by running:
 
