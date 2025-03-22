@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getRummageApiEndpoint } from "@/lib/api-config"
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     console.log("Checking crawl status for ID:", id)
 
     // Call the Rummage API to check crawl status
-    const response = await fetch(`https://rummage.thebitop.net/v1/crawl/${id}`, {
+    const response = await fetch(getRummageApiEndpoint(`/v1/crawl/${id}`), {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -46,4 +47,3 @@ export async function GET(request: Request) {
     )
   }
 }
-

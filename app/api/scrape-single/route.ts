@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getRummageApiEndpoint } from "@/lib/api-config"
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     console.log("Scraping URL:", url, "with formats:", formats, "onlyMainContent:", onlyMainContent)
 
     // Call the Rummage API
-    const response = await fetch("https://rummage.thebitop.net/v1/scrape", {
+    const response = await fetch(getRummageApiEndpoint("/v1/scrape"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -51,4 +52,3 @@ export async function POST(request: Request) {
     )
   }
 }
-

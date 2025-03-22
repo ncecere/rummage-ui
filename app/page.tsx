@@ -45,8 +45,8 @@ export default function Home() {
   const { toast } = useToast()
 
   // Crawl options
-  const [excludePaths, setExcludePaths] = useState("/admin, /private")
-  const [includePaths, setIncludePaths] = useState("/blog, /docs")
+  const [excludePaths, setExcludePaths] = useState("")
+  const [includePaths, setIncludePaths] = useState("")
   const [maxDepth, setMaxDepth] = useState(3)
   const [ignoreSitemap, setIgnoreSitemap] = useState(false)
   const [ignoreQueryParameters, setIgnoreQueryParameters] = useState(true)
