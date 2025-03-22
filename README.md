@@ -53,3 +53,4 @@ The application uses the following environment variables:
 ## Production
 
 For production deployment, make sure to set the `NEXT_PUBLIC_RUMMAGE_API_URL` environment variable to your production API URL.
+# rummage-ui
