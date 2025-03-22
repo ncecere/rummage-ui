@@ -1,0 +1,96 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for version
+        id: extract_changelog
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          VERSION_WITHOUT_V=${VERSION#v}
+          
+          # Extract the changelog for this version
+          CHANGELOG_CONTENT=$(awk -v ver="## [$VERSION]" 'BEGIN{flag=0} $0~ver{flag=1; next} /^## \[/{if(flag==1) exit} flag{print}' CHANGELOG.md)
+          
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            # Try without the 'v' prefix
+            CHANGELOG_CONTENT=$(awk -v ver="## [v$VERSION_WITHOUT_V]" 'BEGIN{flag=0} $0~ver{flag=1; next} /^## \[/{if(flag==1) exit} flag{print}' CHANGELOG.md)
+          fi
+          
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_OUTPUT
+            echo "No changelog entry found for $VERSION" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Generate commit history
+        id: commit_history
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ steps.get_version.outputs.VERSION }}^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "COMMIT_HISTORY<<EOF" >> $GITHUB_OUTPUT
+            echo "Initial release" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "COMMIT_HISTORY<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"* %s (%h)" $PREVIOUS_TAG..${{ steps.get_version.outputs.VERSION }} >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            # Rummage UI ${{ steps.get_version.outputs.VERSION }}
+            
+            ## Changelog
+            ${{ steps.extract_changelog.outputs.CHANGELOG_CONTENT }}
+            
+            ## Commit History
+            ${{ steps.commit_history.outputs.COMMIT_HISTORY }}
+            
+            ## Docker Image
+            
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.VERSION }}
+            ```
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
