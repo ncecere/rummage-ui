@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import JSZip from "jszip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -491,21 +492,75 @@ export default function Home() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadAllMarkdown = () => {
-    crawlResults.forEach((result) => {
-      if (!result.markdown || !result.metadata?.sourceURL) return
+  const downloadAsZip = async (files: Array<{ content: string; filename: string; extension: string }>) => {
+    // If there's only one file, download it directly without creating a zip
+    if (files.length === 1) {
+      const file = files[0]
+      downloadFile(file.content, file.filename, file.extension)
+      return
+    }
 
-      try {
-        const urlObj = new URL(result.metadata.sourceURL)
-        let filename = urlObj.pathname.replace(/\//g, "-").replace(/^-/, "")
-        if (!filename) filename = urlObj.hostname
-
-        downloadFile(result.markdown, filename, "md")
-      } catch (e) {
-        // Fallback filename
-        downloadFile(result.markdown, `page-${Math.random().toString(36).substring(7)}`, "md")
-      }
+    // Create a new zip file
+    const zip = new JSZip()
+    
+    // Add each file to the zip
+    files.forEach((file) => {
+      zip.file(`${file.filename}.${file.extension}`, file.content)
     })
+    
+    // Generate the zip file
+    const zipContent = await zip.generateAsync({ type: "blob" })
+    
+    // Create a download link and trigger the download
+    const url = URL.createObjectURL(zipContent)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `rummage-export-${new Date().toISOString().slice(0, 10)}.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: "Download Started",
+      description: `Downloading ${files.length} files as a zip archive`,
+    })
+  }
+
+  const downloadAllMarkdown = async () => {
+    const filesToDownload = crawlResults
+      .filter(result => result.markdown && result.metadata?.sourceURL)
+      .map(result => {
+        try {
+          const urlObj = new URL(result.metadata!.sourceURL)
+          let filename = urlObj.pathname.replace(/\//g, "-").replace(/^-/, "")
+          if (!filename) filename = urlObj.hostname
+          
+          return {
+            content: result.markdown!,
+            filename,
+            extension: "md"
+          }
+        } catch (e) {
+          // Fallback filename
+          return {
+            content: result.markdown!,
+            filename: `page-${Math.random().toString(36).substring(7)}`,
+            extension: "md"
+          }
+        }
+      })
+
+    if (filesToDownload.length === 0) {
+      toast({
+        title: "No Files to Download",
+        description: "There are no markdown files available to download",
+        variant: "destructive",
+      })
+      return
+    }
+
+    await downloadAsZip(filesToDownload)
   }
 
   return (
@@ -1151,21 +1206,40 @@ export default function Home() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          batchResults.forEach((result, index) => {
-                            if (!result.markdown || !result.metadata?.sourceURL) return
+                        onClick={async () => {
+                          const filesToDownload = batchResults
+                            .filter(result => result.markdown && result.metadata?.sourceURL)
+                            .map((result, index) => {
+                              try {
+                                const urlObj = new URL(result.metadata!.sourceURL)
+                                let filename = urlObj.pathname.replace(/\//g, "-").replace(/^-/, "")
+                                if (!filename) filename = urlObj.hostname
+                                
+                                return {
+                                  content: result.markdown!,
+                                  filename,
+                                  extension: "md"
+                                }
+                              } catch (e) {
+                                // Fallback filename
+                                return {
+                                  content: result.markdown!,
+                                  filename: `batch-${index}`,
+                                  extension: "md"
+                                }
+                              }
+                            })
 
-                            try {
-                              const urlObj = new URL(result.metadata.sourceURL)
-                              let filename = urlObj.pathname.replace(/\//g, "-").replace(/^-/, "")
-                              if (!filename) filename = urlObj.hostname
+                          if (filesToDownload.length === 0) {
+                            toast({
+                              title: "No Files to Download",
+                              description: "There are no markdown files available to download",
+                              variant: "destructive",
+                            })
+                            return
+                          }
 
-                              downloadFile(result.markdown, filename, "md")
-                            } catch (e) {
-                              // Fallback filename
-                              downloadFile(result.markdown, `batch-${index}`, "md")
-                            }
-                          })
+                          await downloadAsZip(filesToDownload)
                         }}
                         className="border-input bg-background hover:bg-secondary"
                       >
