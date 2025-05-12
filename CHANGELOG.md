@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.0] - 2025-05-11
+
+### Changed
+- Refactored `app/page.tsx` by splitting each of the five main feature tabs (Scrape, Crawl, Map, Batch, Search) into its own dedicated component within the `components/features/` directory.
+- Centralized shared utility functions (`copyToClipboard`, `downloadFile`, `downloadAsZip`) into `lib/utils.ts`.
+- Each feature tab component now manages its own state and uses the `useToast` hook independently.
+- This significantly improves code organization, maintainability, and readability of the main page component.
+
 ## [v0.3.0] - 2025-05-11
 
 ### Added
