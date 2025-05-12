@@ -689,25 +689,25 @@ export default function Home() {
             value="single"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
-            Single Page
+            Scrape
           </TabsTrigger>
           <TabsTrigger
             value="site"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
-            Entire Site
+            Crawl
           </TabsTrigger>
           <TabsTrigger
             value="map"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
-            URL Discovery
+            Map
           </TabsTrigger>
           <TabsTrigger
             value="batch"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
-            Batch Scrape
+            Batch
           </TabsTrigger>
           <TabsTrigger
             value="search"
