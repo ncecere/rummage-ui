@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.0] - 2025-05-11
+
+### Added
+- Progress bar display for "Entire Site" crawl feature.
+- Progress bar display for "Batch Scrape" feature.
+
+### Fixed
+- Resolved issue where "Entire Site" crawl status was not correctly updated, preventing results from displaying.
+- Corrected "Entire Site" crawl progress bar to display accurately and remain visible during processing.
+- Fixed "URL Discovery" (map site) feature to correctly parse API response and display discovered URLs.
+- Addressed issues in "Batch Scrape" feature related to API response handling for starting jobs and polling status.
+- Corrected "Batch Scrape" progress bar to display accurately and remain visible during processing.
+- Improved error message display for site crawl failures.
+
 ## [v0.1.0] - 2025-03-22
 
 ### Added
@@ -22,4 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated project name to "rummage-ui"
 - Improved documentation with detailed usage instructions
 
+[v0.2.0]: https://github.com/ncecere/rummage-ui/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/ncecere/rummage-ui/releases/tag/v0.1.0
