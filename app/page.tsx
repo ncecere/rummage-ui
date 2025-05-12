@@ -34,6 +34,7 @@ export default function Home() {
   const [isLoadingBatch, setIsLoadingBatch] = useState(false)
   const [crawlJobId, setCrawlJobId] = useState("")
   const [crawlStatus, setCrawlStatus] = useState("")
+  const [crawlErrorMessage, setCrawlErrorMessage] = useState<string | null>(null) // New state for detailed error
   const [crawlProgress, setCrawlProgress] = useState({ total: 0, completed: 0 })
   const [crawlResults, setCrawlResults] = useState<
     Array<{
@@ -147,11 +148,11 @@ export default function Home() {
         throw new Error(data.error || "API request failed")
       }
 
-      setMapResults(data.data?.links || [])
+      setMapResults(data.links || []) // Correctly access data.links
 
       toast({
         title: "URL Discovery Complete",
-        description: `Found ${data.data?.links?.length || 0} URLs`,
+        description: `Found ${data.links?.length || 0} URLs`, // Correctly access data.links
       })
     } catch (error) {
       console.error("URL mapping error:", error)
@@ -189,8 +190,8 @@ export default function Home() {
       setIsLoadingBatch(true)
       setBatchResults([])
       setBatchJobId("")
-      setBatchStatus("")
-      setBatchProgress({ total: 0, completed: 0 })
+      setBatchStatus("starting") // Set status to "starting" immediately
+      setBatchProgress({ total: 0, completed: 0 }) // Reset progress
 
       // Parse URLs from textarea (one per line)
       const urlsArray = batchUrls
@@ -216,13 +217,14 @@ export default function Home() {
       }
 
       const data = await response.json()
-      if (!data.success) {
-        throw new Error(data.error || "API returned an error")
+      // The 'success' field and 'id' are top-level in Firecrawl's response for starting a batch job
+      if (!data.success) { 
+        throw new Error(data.error || "API returned an error when starting batch job")
       }
 
-      const jobId = data.data?.id
+      const jobId = data.id // Correctly access data.id
       if (!jobId) {
-        throw new Error("No job ID returned from API")
+        throw new Error("No job ID returned from API after starting batch job")
       }
 
       setBatchJobId(jobId)
@@ -250,27 +252,29 @@ export default function Home() {
         throw new Error("Failed to get batch status")
       }
 
-      const data = await response.json()
-      if (!data.success) {
-        throw new Error(data.error || "API returned an error")
-      }
+      const data = await response.json() 
+      // Firecrawl's GET status response does not have a top-level 'success' field.
+      // Our backend returns Firecrawl's response directly if the call to rummage-api was ok.
+      // The actual status is in data.status.
 
-      const status = data.data?.status
+      const status = data.status // Access status directly
       setBatchStatus(status || "unknown")
       setBatchProgress({
-        total: data.data?.total || 0,
-        completed: data.data?.completed || 0,
+        total: data.total || 0,    // Access total directly
+        completed: data.completed || 0, // Access completed directly
       })
 
       if (status === "completed") {
-        setBatchResults(data.data?.data || [])
+        // The array of results is under data.data in Firecrawl's status response
+        setBatchResults(data.data || []) 
         toast({
           title: "Batch Scraping Complete",
-          description: `Successfully scraped ${data.data?.data?.length || 0} URLs`,
+          description: `Successfully scraped ${data.data?.length || 0} URLs`,
         })
         setIsLoadingBatch(false)
       } else if (status === "error") {
-        throw new Error("Batch job failed")
+        // Firecrawl status itself indicates an error with the job
+        throw new Error("Batch job failed as reported by Firecrawl status API")
       } else {
         // Continue polling
         setTimeout(() => pollBatchStatus(jobId), 2000)
@@ -362,8 +366,9 @@ export default function Home() {
       setIsLoadingSite(true)
       setCrawlResults([])
       setCrawlJobId("")
-      setCrawlStatus("")
-      setCrawlProgress({ total: 0, completed: 0 })
+      setCrawlStatus("starting") // Set status to "starting" immediately
+      setCrawlErrorMessage(null) // Reset error message
+      setCrawlProgress({ total: 0, completed: 0 }) // Reset progress
 
       // Parse exclude/include paths from comma-separated strings to arrays
       const excludePathsArray = excludePaths
@@ -397,18 +402,26 @@ export default function Home() {
         }),
       })
 
+      const data = await response.json() // Always parse JSON to get error details
+      console.log("Frontend startCrawl: Received data from /api/crawl-site", JSON.stringify(data, null, 2))
+
       if (!response.ok) {
-        throw new Error("Failed to start crawl")
+        // Throw an error object that includes the detailed message from the backend
+        const errorPayload: any = { 
+          message: data.error || `API request failed with status ${response.status}` 
+        }
+        if (data.crawlJobId) errorPayload.crawlJobId = data.crawlJobId
+        if (data.details) errorPayload.details = data.details
+        throw errorPayload
       }
 
-      const data = await response.json()
-      if (!data.success) {
-        throw new Error(data.error || "API returned an error")
-      }
-
-      const jobId = data.data?.id
+      // The successful response from FireCrawl has the ID at the top level: data.id
+      // The backend route /api/crawl-site directly returns this JSON.
+      const jobId = data.id 
       if (!jobId) {
-        throw new Error("No job ID returned from API")
+        // This should ideally not happen if response.ok is true and FireCrawl API is consistent
+        console.error("Successful response from /api/crawl-site but no job ID found in data:", data)
+        throw new Error("No job ID returned from API despite successful call.")
       }
 
       setCrawlJobId(jobId)
@@ -416,11 +429,14 @@ export default function Home() {
 
       // Start polling for results
       await pollCrawlStatus(jobId)
-    } catch (error) {
+    } catch (error: any) {
       setCrawlStatus("error")
+      // Use the detailed error message from the caught error object
+      const description = error?.message || "An unknown error occurred while starting crawl."
+      setCrawlErrorMessage(description + (error?.crawlJobId ? ` (Job ID: ${error.crawlJobId})` : "") + (error?.details ? ` Details: ${JSON.stringify(error.details)}` : ""))
       toast({
         title: "Crawling Failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description,
         variant: "destructive",
       })
       setIsLoadingSite(false)
@@ -437,31 +453,49 @@ export default function Home() {
       }
 
       const data = await response.json()
+      console.log(`Frontend pollCrawlStatus (jobId: ${jobId}): Received data from /api/crawl-status`, JSON.stringify(data, null, 2))
+
       if (!data.success) {
-        throw new Error(data.error || "API returned an error")
+        console.error(`Frontend pollCrawlStatus (jobId: ${jobId}): API call to /api/crawl-status was not successful. Data:`, data)
+        throw new Error(data.error || "API returned an error during status check")
       }
 
-      const status = data.data?.status
-      setCrawlStatus(status || "unknown")
+      // The 'data' object here is the direct response from our /api/crawl-status endpoint.
+      // Based on logs, when complete, it looks like:
+      // { success: true, status: "completed", completed: 77, total: 77, data: [...] }
+      // The Firecrawl 'status', 'total', 'completed' are top-level in our backend's response.
+      // The Firecrawl 'data' (array of results) is also top-level in our backend's response, named 'data'.
+
+      const status = data.status; // Read status from the top level of our backend's response
+      
+      console.log(`Frontend pollCrawlStatus (jobId: ${jobId}): Extracted status from data.status: '${status}'`)
+
+      setCrawlStatus(status || "unknown");
       setCrawlProgress({
-        total: data.data?.total || 0,
-        completed: data.data?.completed || 0,
-      })
+        total: data.total || 0,       // Read total from the top level
+        completed: data.completed || 0, // Read completed from the top level
+      });
 
       if (status === "completed") {
-        setCrawlResults(data.data?.data || [])
+        console.log(`Frontend pollCrawlStatus (jobId: ${jobId}): Status is 'completed'. Setting results and stopping loading.`);
+        // The array of crawled pages is in data.data (our backend's 'data' field, which holds Firecrawl's 'data' field)
+        const resultsArray = data.data || [];
+        setCrawlResults(resultsArray);
         toast({
           title: "Crawling Complete",
-          description: `Successfully crawled ${data.data?.data?.length || 0} pages`,
-        })
-        setIsLoadingSite(false)
-      } else if (status === "error") {
-        throw new Error("Crawl job failed")
+          description: `Successfully crawled ${resultsArray.length || 0} pages`,
+        });
+        setIsLoadingSite(false);
+      } else if (status === "error" || data.status === "error") { // Check both possible error status locations
+        console.error(`Frontend pollCrawlStatus (jobId: ${jobId}): Status is 'error'.`)
+        throw new Error("Crawl job failed as reported by API")
       } else {
+        console.log(`Frontend pollCrawlStatus (jobId: ${jobId}): Status is '${status}'. Continuing polling.`)
         // Continue polling
         setTimeout(() => pollCrawlStatus(jobId), 2000)
       }
     } catch (error) {
+      console.error(`Frontend pollCrawlStatus (jobId: ${jobId}): Caught error:`, error)
       setCrawlStatus("error")
       toast({
         title: "Polling Failed",
@@ -1168,29 +1202,52 @@ export default function Home() {
                   {isLoadingBatch ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {batchStatus === "starting" ? "Starting Batch" : "Processing..."}
+                      {batchStatus === "starting"
+                        ? "Starting Batch..."
+                        : batchStatus === "processing"
+                          ? `Processing... ${batchProgress.completed}/${batchProgress.total || "?"}`
+                          : batchStatus === "completed"
+                            ? `Completed ${batchProgress.completed}/${batchProgress.total || "?"}`
+                            : "Processing..."}
                     </>
                   ) : (
                     "Start Batch Scrape"
                   )}
                 </Button>
 
-                {isLoadingBatch && batchStatus === "processing" && (
-                  <div className="space-y-2">
+                {isLoadingBatch && (
+                  <div className="space-y-2 mt-4">
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Processing in progress...</span>
+                      <span className="text-sm text-muted-foreground">
+                        {batchStatus === "starting"
+                          ? "Initiating batch scrape..."
+                          : batchStatus === "processing"
+                            ? "Processing in progress..."
+                            : batchStatus === "completed"
+                              ? "Batch scrape completed! Finalizing..."
+                              : batchStatus === "error"
+                                ? "An error occurred."
+                                : "Processing..."}
+                      </span>
                       <span className="text-sm text-muted-foreground">
                         {batchProgress.completed} / {batchProgress.total || "?"}
                       </span>
                     </div>
                     <Progress
-                      value={(batchProgress.completed / (batchProgress.total || 1)) * 100}
-                      className="h-2 bg-secondary"
+                      value={
+                        batchStatus === "completed"
+                          ? 100
+                          : batchProgress.total > 0
+                            ? (batchProgress.completed / batchProgress.total) * 100
+                            : 0
+                      }
+                      className="w-full h-2 [&>div]:bg-primary"
                     />
                   </div>
                 )}
 
-                {batchStatus === "error" && (
+                {/* Display error message separately, not tied to isLoadingBatch, but tied to batchStatus === 'error' */}
+                {batchStatus === "error" && !isLoadingBatch && (
                   <div className="bg-destructive/10 p-4 rounded-md flex items-start">
                     <AlertCircle className="h-5 w-5 text-destructive mr-2 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-destructive">
@@ -1564,35 +1621,55 @@ export default function Home() {
                   {isLoadingSite ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {crawlStatus === "starting" ? "Starting Crawl" : "Crawling..."}
+                      {crawlStatus === "starting"
+                        ? "Starting Crawl..."
+                        : crawlStatus === "processing"
+                          ? `Crawling... ${crawlProgress.completed}/${crawlProgress.total || "?"}`
+                          : crawlStatus === "completed"
+                            ? `Completed ${crawlProgress.completed}/${crawlProgress.total || "?"}`
+                            : "Processing..."}
                     </>
                   ) : (
                     "Crawl Site"
                   )}
                 </Button>
 
-                {isLoadingSite && crawlStatus === "processing" && (
-                  <div className="space-y-2">
+                {isLoadingSite && (
+                  <div className="space-y-2 mt-4">
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Crawling in progress...</span>
+                      <span className="text-sm text-muted-foreground">
+                        {crawlStatus === "starting"
+                          ? "Initiating crawl..."
+                          : crawlStatus === "processing"
+                            ? "Crawling in progress..."
+                            : crawlStatus === "completed"
+                              ? "Crawl completed! Finalizing..."
+                              : crawlStatus === "error"
+                                ? "An error occurred."
+                                : "Processing..."}
+                      </span>
                       <span className="text-sm text-muted-foreground">
                         {crawlProgress.completed} / {crawlProgress.total || "?"}
                       </span>
                     </div>
                     <Progress
-                      value={(crawlProgress.completed / (crawlProgress.total || 1)) * 100}
-                      className="h-2 bg-secondary"
+                      value={
+                        crawlStatus === "completed" 
+                          ? 100 
+                          : crawlProgress.total > 0 
+                            ? (crawlProgress.completed / crawlProgress.total) * 100 
+                            : 0
+                      }
+                      className="w-full h-2 [&>div]:bg-primary"
                     />
                   </div>
                 )}
 
-                {crawlStatus === "error" && (
+                {/* Display error message separately, not tied to isLoadingSite, but tied to crawlStatus === 'error' */}
+                {crawlStatus === "error" && crawlErrorMessage && !isLoadingSite && (
                   <div className="bg-destructive/10 p-4 rounded-md flex items-start">
                     <AlertCircle className="h-5 w-5 text-destructive mr-2 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-destructive">
-                      An error occurred while crawling the site. Please try again with different parameters or check the
-                      URL.
-                    </p>
+                    <p className="text-sm text-destructive">{crawlErrorMessage}</p>
                   </div>
                 )}
 
